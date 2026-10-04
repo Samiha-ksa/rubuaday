@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One Rubu a Day - Quran Progress Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:wght@500;600;700&family=Amiri+Quran&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {
+                colors: {
+                    emerald: { 50:'#eff6f2',100:'#dcebe3',200:'#b9d8c8',300:'#8dbfa5',400:'#5da283',500:'#3a8666',600:'#1f6b4f',700:'#185540',800:'#124232',900:'#0d3025' },
+                    stone: { 50:'#f5f6f2',100:'#eceee8',200:'#dde1d8',300:'#c4cabf',400:'#8f978c',500:'#687065',600:'#4f564d' },
+                    slate: { 400:'#9aaba2',300:'#c3cfc8',600:'#33443c',700:'#25332d',800:'#16211d',900:'#0e1613' },
+                    amberGold: { 400:'#d9b45a',500:'#c9a14a',600:'#b08a37' }
+                },
+                borderRadius: { xl:'0.5rem', '2xl':'0.75rem', '3xl':'1rem' },
+                fontFamily: { sans:['Plus Jakarta Sans','sans-serif'], serif:['Newsreader','Georgia','serif'], arabic:['Amiri Quran','serif'] }
+            } }
+        }
+    </script>
+    <style>
+        :root { --line:#dde1d8; --muted:#687065; --chip:#e4efe9; --chip-ink:#185540; }
+        .dark { --line:#25332d; --muted:#9aaba2; --chip:#16302a; --chip-ink:#8dbfa5; }
+        body { font-family:'Plus Jakarta Sans',sans-serif; transition:background-color .3s,color .3s; }
+        h1,h2 { font-family:'Newsreader',Georgia,serif; letter-spacing:-.01em; }
+        .custom-scrollbar::-webkit-scrollbar { width:6px; height:6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background:transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background:rgba(31,107,79,.3); border-radius:8px; }
+        .hero-pattern { background-image:radial-gradient(circle at 100% 0,rgba(255,255,255,.10),transparent 45%),repeating-linear-gradient(45deg,rgba(255,255,255,.035) 0 1px,transparent 1px 14px),repeating-linear-gradient(-45deg,rgba(255,255,255,.035) 0 1px,transparent 1px 14px); }
+        .pill { font-size:.75rem; font-weight:600; padding:.4rem .8rem; border-radius:999px; border:1px solid var(--line); color:var(--muted); transition:all .15s; }
+        .pill:hover { border-color:#1f6b4f; }
+        .pill.on { background:#1f6b4f; border-color:#1f6b4f; color:#fff; }
+        button:focus-visible, select:focus-visible { outline:2px solid #3a8666; outline-offset:2px; }
+
+        /* Word-by-word reader: Arabic flows right to left, English is left to right inside each word */
+        .verse { padding:1.4rem 0; border-bottom:1px solid var(--line); }
+        .verse:last-child { border-bottom:0; }
+        .verse-ref { display:inline-block; font-size:.72rem; font-weight:700; color:var(--chip-ink); background:var(--chip); padding:.15rem .6rem; border-radius:999px; margin-bottom:.7rem; }
+        .surah-break { text-align:center; font-family:'Newsreader',serif; font-size:1.05rem; font-weight:600; color:var(--chip-ink); padding:1rem 0 .25rem; }
+        .words { display:flex; flex-wrap:wrap; gap:.25rem .4rem; justify-content:flex-start; }
+        .w { display:flex; flex-direction:column; align-items:center; text-align:center; padding:.35rem .55rem; border-radius:.5rem; min-width:3rem; max-width:7.5rem; transition:background .15s; }
+        .w:hover { background:var(--chip); }
+        .w-ar { font-family:'Amiri Quran','Amiri',serif; font-size:1.9rem; line-height:2.1; }
+        .w-tr { direction:ltr; font-size:.68rem; font-style:italic; color:#3a8666; margin-top:.1rem; }
+        .w-en { direction:ltr; font-size:.75rem; line-height:1.3; color:var(--muted); margin-top:.15rem; }
+        .ayah-end { align-self:flex-start; margin-top:.75rem; display:inline-flex; align-items:center; justify-content:center; width:2.1rem; height:2.1rem; border:1.5px solid #c9a14a; border-radius:50%; color:#b08a37; font-family:'Amiri Quran',serif; font-size:.95rem; }
+        .hide-translit .w-tr { display:none; }
+        .hide-meaning .w-en { display:none; }
+        .verse { margin:0 -.75rem; padding:1.4rem .75rem; border-radius:.6rem; }
+        .verse.playing { background:var(--chip); box-shadow:inset 3px 0 0 #c9a14a; }
+        .verse-ref { cursor:pointer; border:0; }
+        .verse-ref i { font-size:.55rem; margin-right:.35rem; }
+        .verse-tr { direction:ltr; margin-top:.6rem; font-size:.9rem; line-height:1.6; color:var(--muted); max-width:65ch; }
+        .hide-verse .verse-tr { display:none; }
+        .w-tr:empty, .w-en:empty { display:none; }
+        .reader-note { font-size:.75rem; color:var(--muted); padding:.5rem 0; }
+        .bismillah { font-family:'Amiri Quran',serif; font-size:1.7rem; margin-top:.4rem; font-weight:400; }
+        .verse-source { font-size:.7rem; color:var(--muted); text-align:center; padding:1rem 0 .25rem; }
+        .hide-verse .verse-source { display:none; }
+        body > header { box-shadow:0 1px 0 rgba(201,161,74,.45); }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 dark:bg-slate-900 dark:text-stone-100 min-h-screen flex flex-col antialiased selection:bg-emerald-200 dark:selection:bg-emerald-900">
+
+    <header class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-stone-200 dark:border-slate-700 sticky top-0 z-40 px-4 py-3.5">
+        <div class="max-w-5xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3.5">
+                <svg class="w-11 h-11 shrink-0" viewBox="0 0 48 48" aria-hidden="true">
+                    <rect width="48" height="48" rx="11" fill="#124232"/>
+                    <g fill="none" stroke="#d9b45a" stroke-width="1.8" stroke-linejoin="round">
+                        <rect x="12" y="12" width="24" height="24"/>
+                        <rect x="12" y="12" width="24" height="24" transform="rotate(45 24 24)"/>
+                    </g>
+                    <circle cx="24" cy="24" r="4.2" fill="#d9b45a"/>
+                </svg>
+                <div>
+                    <h1 class="text-2xl font-semibold leading-none text-stone-900 dark:text-white flex items-baseline gap-3">One Rubu a Day <span class="font-arabic text-lg font-normal text-amberGold-600" lang="ar" dir="rtl">رُبْعٌ كُلَّ يَوْمٍ</span></h1>
+                    <p class="text-xs mt-1.5 text-stone-500 dark:text-slate-400">ADHD-Friendly Daily Quran Tracker</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-sm font-bold">
+                    <i class="fa-solid fa-fire text-amber-500"></i>
+                    <span id="streakCounter">0 Day Streak</span>
+                </div>
+
+                <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600 transition" title="Toggle Light/Dark Theme">
+                    <i class="fa-solid fa-moon dark:hidden"></i>
+                    <i class="fa-solid fa-sun hidden dark:inline"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 space-y-6">
+
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-check-double"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-stone-500 dark:text-slate-400 font-medium block">Completed</span>
+                    <span class="text-2xl font-black text-stone-800 dark:text-stone-100"><span id="completedRubuCount">0</span> <span class="text-sm font-normal text-stone-400">/ 240 Rubu</span></span>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-book-bookmark"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-stone-500 dark:text-slate-400 font-medium block">Current Focus</span>
+                    <span class="text-xl font-bold text-stone-800 dark:text-stone-100" id="currentPositionText">Juz 1 • Rubu 1</span>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 shadow-sm flex flex-col justify-center">
+                <div class="flex justify-between items-center text-xs text-stone-500 dark:text-slate-400 mb-1.5 font-medium">
+                    <span>Overall Progression</span>
+                    <span id="overallPercentText" class="font-bold text-emerald-600 dark:text-emerald-400">0%</span>
+                </div>
+                <div class="w-full bg-stone-100 dark:bg-slate-700 h-3 rounded-full overflow-hidden">
+                    <div id="overallProgressBar" class="bg-emerald-600 h-full w-0 transition-all duration-500"></div>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                <div class="w-12 h-12 shrink-0 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl"><i class="fa-solid fa-award"></i></div>
+                <div class="flex-1 min-w-0">
+                    <span class="text-xs text-stone-500 dark:text-slate-400 font-medium block">Times finished the Quran</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl font-black text-stone-800 dark:text-stone-100" id="khatmahCount">0</span>
+                        <span class="flex gap-1 ml-auto">
+                            <button onclick="adjustKhatmah(-1)" aria-label="Decrease count" class="w-6 h-6 rounded-md bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600 text-sm leading-none">&minus;</button>
+                            <button onclick="adjustKhatmah(1)" aria-label="Increase count" class="w-6 h-6 rounded-md bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-slate-600 text-sm leading-none">+</button>
+                        </span>
+                    </div>
+                    <button id="khatmahFinishBtn" onclick="finishKhatmah()" class="hidden mt-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 underline text-left">Log this completion and start again</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-800 p-2.5 rounded-2xl border border-stone-200 dark:border-slate-700 shadow-sm">
+            <div class="flex gap-2">
+                <button onclick="setViewMode('today')" id="viewBtnToday" class="px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white shadow-sm transition">
+                    <i class="fa-solid fa-bullseye mr-1.5"></i> Today's Focus
+                </button>
+                <button onclick="setViewMode('navigator')" id="viewBtnNavigator" class="px-4 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-table-cells mr-1.5"></i> All 240 Rubus
+                </button>
+                <button onclick="setViewMode('history')" id="viewBtnHistory" class="px-4 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-clock-rotate-left mr-1.5"></i> Reflection Journal
+                </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div class="flex items-center gap-2">
+                <label for="reciterSelect" class="text-xs text-stone-500 dark:text-slate-400 font-medium">Reciter:</label>
+                <select id="reciterSelect" onchange="changeReciter()" class="text-xs font-semibold p-2 rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-900 text-stone-800 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="7">Mishary Rashid Alafasy</option>
+                    <option value="5">Mahmoud Khalil Al-Husary</option>
+                    <option value="8">Siddiq Al-Minshawi</option>
+                </select>
+            </div>
+            </div>
+        </div>
+
+        <section id="viewToday" class="space-y-6">
+            <div class="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+                <div class="relative z-10 space-y-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-semibold text-emerald-100" id="todayMetaBadge">
+                            Juz 1 • Hizb 1 • Rubu 1
+                        </span>
+                        <span class="text-xs bg-amber-400/90 text-stone-900 font-extrabold px-3 py-1 rounded-full flex items-center gap-1">
+                            <i class="fa-solid fa-star"></i> Active Daily Portion
+                        </span>
+                    </div>
+
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-semibold" id="todaySurahTitle">Surah Al-Fatihah 1:1 - Al-Baqarah 1:25</h2>
+                        <p class="font-arabic text-emerald-100 text-xl mt-2 text-left" dir="rtl" lang="ar" id="todayArabicTitle">الجزء ١ • الربع ١</p>
+                    </div>
+
+                    <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between text-xs font-medium text-emerald-100">
+                            <span><i class="fa-solid fa-headphones mr-1.5"></i> Audio Recitation</span>
+                            <span class="flex items-center gap-1.5">
+                                <button onclick="stepVerse(-1)" class="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20" aria-label="Previous verse"><i class="fa-solid fa-backward-step"></i></button>
+                                <span id="audioStatusText" class="text-[11px] opacity-90 min-w-[8rem] text-center">Loading verses…</span>
+                                <button onclick="stepVerse(1)" class="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20" aria-label="Next verse"><i class="fa-solid fa-forward-step"></i></button>
+                            </span>
+                        </div>
+                        <audio id="rubuAudioPlayer" controls class="w-full rounded-xl bg-white/20">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+
+                    <div class="pt-2 flex flex-wrap items-center justify-between gap-4">
+                        <button id="markCompleteBtn" onclick="toggleCompleteCurrentRubu()" class="px-6 py-3.5 rounded-2xl bg-amberGold-500 hover:bg-amberGold-600 text-stone-900 font-extrabold text-sm shadow-lg hover:shadow-xl transition flex items-center gap-2">
+                            <i class="fa-solid fa-circle-check text-base"></i>
+                            <span>Mark Today's Rubu as Completed</span>
+                        </button>
+
+                        <div class="flex gap-2">
+                            <button onclick="navigateRubu(-1)" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition">
+                                <i class="fa-solid fa-chevron-left mr-1"></i> Previous
+                            </button>
+                            <button onclick="navigateRubu(1)" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition">
+                                Next <i class="fa-solid fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-pattern absolute inset-0 pointer-events-none"></div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-stone-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 dark:border-slate-700 pb-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-sm">
+                            <i class="fa-solid fa-language"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-stone-800 dark:text-stone-100 text-base">Word-by-Word Reader</h3>
+                            <p class="text-xs text-stone-500 dark:text-slate-400">Arabic reads right to left, with the English meaning under each word. Tap a verse number to play from there.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="toggleVerseBtn" onclick="toggleReaderPref('showVerse')" class="pill">Translation</button>
+                        <button id="toggleMeaningBtn" onclick="toggleReaderPref('showMeaning')" class="pill">Word meaning</button>
+                        <button id="toggleTranslitBtn" onclick="toggleReaderPref('showTranslit')" class="pill">Transliteration</button>
+                        <button onclick="fetchWordByWordData(true)" class="pill" title="Reload" aria-label="Reload"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
+                </div>
+
+                <div id="wordByWordContainer" class="reader max-h-[70vh] overflow-y-auto px-2 custom-scrollbar">
+                    <div class="text-center py-8 text-stone-400 dark:text-slate-500 text-sm">
+                        <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-600 mb-2 block"></i>
+                        Loading Word-by-Word Translation...
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-stone-200 dark:border-slate-700 shadow-sm space-y-3">
+                <h3 class="font-bold text-stone-800 dark:text-stone-100 flex items-center gap-2 text-base">
+                    <i class="fa-solid fa-pen-fancy text-emerald-600 dark:text-emerald-400"></i> Daily Reflection & Personal Notes
+                </h3>
+                <p class="text-xs text-stone-500 dark:text-slate-400">Write key Ayah takeaways, personal thoughts, or memorable insights from this Rubu.</p>
+                <textarea id="todayReflectionInput" oninput="saveCurrentReflection()" rows="4" placeholder="Write your reflection here..." class="w-full p-3 text-sm rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-900 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scrollbar resize-none"></textarea>
+            </div>
+        </section>
+
+        <section id="viewNavigator" class="hidden space-y-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 shadow-sm flex flex-wrap justify-between items-center gap-3">
+                <div>
+                    <h3 class="font-bold text-stone-800 dark:text-stone-100">All 240 Rubu Accordion Navigator</h3>
+                    <p class="text-xs text-stone-500 dark:text-slate-400">Expand any Juz to jump directly or mark portions as read.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="expandAllJuz()" class="px-3 py-1.5 rounded-lg text-xs bg-stone-100 dark:bg-slate-700 hover:bg-stone-200 dark:hover:bg-slate-600 text-stone-700 dark:text-stone-200 font-semibold">Expand All</button>
+                    <button onclick="collapseAllJuz()" class="px-3 py-1.5 rounded-lg text-xs bg-stone-100 dark:bg-slate-700 hover:bg-stone-200 dark:hover:bg-slate-600 text-stone-700 dark:text-stone-200 font-semibold">Collapse All</button>
+                </div>
+            </div>
+
+            <div id="juzAccordionContainer" class="space-y-3"></div>
+        </section>
+
+        <section id="viewHistory" class="hidden space-y-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-stone-200 dark:border-slate-700 shadow-sm space-y-4">
+                <h3 class="font-bold text-stone-800 dark:text-stone-100 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-emerald-600"></i> My Quranic Reflections Journal
+                </h3>
+                <div id="historyListContainer" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <section class="mt-12 bg-white dark:bg-slate-800 rounded-3xl p-6 border border-stone-200 dark:border-slate-700 shadow-sm space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 dark:border-slate-700 pb-4">
+                <div>
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-extrabold ">Complete Progression Matrix</span>
+                    <h2 class="text-xl font-black text-stone-900 dark:text-white mt-1">240 Rubu Progression Checklist</h2>
+                    <p class="text-xs text-stone-500 dark:text-slate-400">All 30 Ajzaa and 240 Rubus mapped out with exact Surah names and Ayah numbers.</p>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <span class="text-xs text-stone-500 dark:text-slate-400 block font-medium">Completed Rubus</span>
+                        <span class="text-lg font-black text-emerald-600 dark:text-emerald-400" id="masterCompletedStats">0 / 240</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-stone-600 dark:text-slate-400">Show:</span>
+                    <button id="filterAllBtn" onclick="filterMasterGrid('all')" class="px-3 py-1 rounded-lg bg-emerald-600 text-white font-bold transition">All 240</button>
+                    <button id="filterDoneBtn" onclick="filterMasterGrid('done')" class="px-3 py-1 rounded-lg bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300 hover:bg-stone-200 font-semibold transition">Completed</button>
+                    <button id="filterPendingBtn" onclick="filterMasterGrid('pending')" class="px-3 py-1 rounded-lg bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300 hover:bg-stone-200 font-semibold transition">Remaining</button>
+                </div>
+
+                <div class="text-stone-400 text-[11px]">
+                    <i class="fa-solid fa-info-circle mr-1"></i> Checking a box updates your progress & streak automatically.
+                </div>
+            </div>
+
+            <div id="masterProgressionGrid" class="space-y-6"></div>
+        </section>
+
+        <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 to-emerald-900 text-white p-6 md:p-8">
+            <div class="hero-pattern absolute inset-0 pointer-events-none"></div>
+            <div class="relative z-10 flex flex-wrap items-center justify-between gap-6">
+                <div class="max-w-md">
+                    <h2 class="text-2xl md:text-3xl font-semibold" id="ramadanTitle">Ramadan</h2>
+                    <p class="text-emerald-100 text-sm mt-1" id="ramadanSub"></p>
+                    <p class="text-xs text-emerald-200/90 mt-3" id="ramadanPace"></p>
+                </div>
+                <div id="ramadanClock" class="flex gap-2 sm:gap-3"></div>
+            </div>
+            <p class="relative z-10 text-[11px] text-emerald-200/70 mt-5">Dates follow the Umm al-Qura calendar used in Saudi Arabia. The actual start depends on the moon sighting and can differ by a day.</p>
+        </section>
+
+    </main>
+
+    <footer class="max-w-5xl w-full mx-auto px-4 md:px-6 pb-10 pt-4 text-center text-xs text-stone-500 dark:text-slate-400 space-y-4">
+        <div id="donateBox" class="hidden">
+            <p>One Rubu a Day is free to use. If it helps your reading, you can support its running costs.</p>
+            <a id="donateLink" href="#" target="_blank" rel="noopener noreferrer" class="inline-block mt-2.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition">Support this project</a>
+        </div>
+        <p>Verses and translation from Al Quran Cloud. Audio from EveryAyah.</p>
+    </footer>
+
+    <div id="juzModal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 md:p-8 max-w-md w-full border border-stone-200 dark:border-slate-700 shadow-2xl text-center space-y-5">
+            <div class="w-20 h-20 bg-amber-100 dark:bg-amber-950/60 text-amber-500 rounded-full flex items-center justify-center text-4xl mx-auto shadow-lg">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">Milestone Unlocked!</span>
+                <h2 class="text-2xl font-black text-stone-900 dark:text-white mt-1" id="juzModalTitle">Juz 1 Complete!</h2>
+                <p class="text-xs text-stone-500 dark:text-slate-400 mt-2 italic">"Allah loves the deeds that are done consistently, even if they are small."</p>
+            </div>
+            
+            <button onclick="closeJuzModal()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-md transition">
+                Continue Journey
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Paste your donation page link between the quotes (Ko-fi, Buy Me a Coffee, etc.). Leave empty to hide the button.
+        const DONATION_URL = '';
+
+        // Exact mapping of Surahs and Ayahs across all 240 Rubus (30 Ajzaa x 8 Rubus)
+        const RUBU_PORTIONS_MAP = [
+            // Juz 1
+            "Al-Fatihah 1:1 - Al-Baqarah 2:25", "Al-Baqarah 2:26 - 2:43", "Al-Baqarah 2:44 - 2:59", "Al-Baqarah 2:60 - 2:74", "Al-Baqarah 2:75 - 2:91", "Al-Baqarah 2:92 - 2:105", "Al-Baqarah 2:106 - 2:123", "Al-Baqarah 2:124 - 2:141",
+            // Juz 2
+            "Al-Baqarah 2:142 - 2:157", "Al-Baqarah 2:158 - 2:176", "Al-Baqarah 2:177 - 2:188", "Al-Baqarah 2:189 - 2:202", "Al-Baqarah 2:203 - 2:218", "Al-Baqarah 2:219 - 2:232", "Al-Baqarah 2:233 - 2:242", "Al-Baqarah 2:243 - 2:252",
+            // Juz 3
+            "Al-Baqarah 2:253 - 2:262", "Al-Baqarah 2:263 - 2:271", "Al-Baqarah 2:272 - 2:282", "Al-Baqarah 2:283 - Aal 'Imran 3:14", "Aal 'Imran 3:15 - 3:32", "Aal 'Imran 3:33 - 3:51", "Aal 'Imran 3:52 - 3:74", "Aal 'Imran 3:75 - 3:92",
+            // Juz 4
+            "Aal 'Imran 3:93 - 3:112", "Aal 'Imran 3:113 - 3:132", "Aal 'Imran 3:133 - 3:152", "Aal 'Imran 3:153 - 3:170", "Aal 'Imran 3:171 - 3:185", "Aal 'Imran 3:186 - 3:200", "An-Nisa 4:1 - 4:11", "An-Nisa 4:12 - 4:23",
+            // Juz 5
+            "An-Nisa 4:24 - 4:35", "An-Nisa 4:36 - 4:57", "An-Nisa 4:58 - 4:73", "An-Nisa 4:74 - 4:87", "An-Nisa 4:88 - 4:99", "An-Nisa 4:100 - 4:113", "An-Nisa 4:114 - 4:134", "An-Nisa 4:135 - 4:147",
+            // Juz 6
+            "An-Nisa 4:148 - 4:162", "An-Nisa 4:163 - 4:176", "Al-Ma'idah 5:1 - 5:11", "Al-Ma'idah 5:12 - 5:26", "Al-Ma'idah 5:27 - 5:40", "Al-Ma'idah 5:41 - 5:50", "Al-Ma'idah 5:51 - 5:66", "Al-Ma'idah 5:67 - 5:81",
+            // Juz 7
+            "Al-Ma'idah 5:82 - 5:96", "Al-Ma'idah 5:97 - 5:108", "Al-Ma'idah 5:109 - Al-An'am 6:12", "Al-An'am 6:13 - 6:35", "Al-An'am 6:36 - 6:58", "Al-An'am 6:59 - 6:73", "Al-An'am 6:74 - 6:94", "Al-An'am 6:95 - 6:110",
+            // Juz 8
+            "Al-An'am 6:111 - 6:126", "Al-An'am 6:127 - 6:140", "Al-An'am 6:141 - 6:150", "Al-An'am 6:151 - 6:165", "Al-A'raf 7:1 - 7:30", "Al-A'raf 7:31 - 7:46", "Al-A'raf 7:47 - 7:64", "Al-A'raf 7:65 - 7:87",
+            // Juz 9
+            "Al-A'raf 7:88 - 7:116", "Al-A'raf 7:117 - 7:141", "Al-A'raf 7:142 - 7:155", "Al-A'raf 7:156 - 7:170", "Al-A'raf 7:171 - 7:188", "Al-A'raf 7:189 - Al-Anfal 8:21", "Al-Anfal 8:22 - 8:40", "Al-Anfal 8:41 - 8:60",
+            // Juz 10
+            "Al-Anfal 8:61 - 8:75", "At-Tawbah 9:1 - 9:18", "At-Tawbah 9:19 - 9:33", "At-Tawbah 9:34 - 9:45", "At-Tawbah 9:46 - 9:59", "At-Tawbah 9:60 - 9:74", "At-Tawbah 9:75 - 9:92", "At-Tawbah 9:93 - 9:110",
+            // Juz 11
+            "At-Tawbah 9:111 - 9:121", "At-Tawbah 9:122 - Yunus 10:10", "Yunus 10:11 - 10:25", "Yunus 10:26 - 10:52", "Yunus 10:53 - 10:70", "Yunus 10:71 - 10:89", "Yunus 10:90 - Hud 11:5", "Hud 11:6 - 11:23",
+            // Juz 12
+            "Hud 11:24 - 11:40", "Hud 11:41 - 11:60", "Hud 11:61 - 11:83", "Hud 11:84 - 11:107", "Hud 11:108 - Yusuf 12:6", "Yusuf 12:7 - 12:29", "Yusuf 12:30 - 12:52", "Yusuf 12:53 - 12:76",
+            // Juz 13
+            "Yusuf 12:77 - 12:100", "Yusuf 12:101 - Ar-Ra'd 13:4", "Ar-Ra'd 13:5 - 13:18", "Ar-Ra'd 13:19 - 13:34", "Ar-Ra'd 13:35 - Ibrahim 14:9", "Ibrahim 14:10 - 14:27", "Ibrahim 14:28 - 14:52", "Al-Hijr 15:1 - 15:48",
+            // Juz 14
+            "Al-Hijr 15:49 - 15:99", "An-Nahl 16:1 - 16:29", "An-Nahl 16:30 - 16:50", "An-Nahl 16:51 - 16:74", "An-Nahl 16:75 - 16:89", "An-Nahl 16:90 - 16:110", "An-Nahl 16:111 - 16:128", "Al-Isra 17:1 - 17:22",
+            // Juz 15
+            "Al-Isra 17:23 - 17:49", "Al-Isra 17:50 - 17:69", "Al-Isra 17:70 - 17:98", "Al-Isra 17:99 - Al-Kahf 18:16", "Al-Kahf 18:17 - 18:31", "Al-Kahf 18:32 - 18:50", "Al-Kahf 18:51 - 18:74", "Al-Kahf 18:75 - 18:110",
+            // Juz 16
+            "Maryam 19:1 - 19:21", "Maryam 19:22 - 19:58", "Maryam 19:59 - 19:98", "Taha 20:1 - 20:54", "Taha 20:55 - 20:82", "Taha 20:83 - 20:110", "Taha 20:111 - 20:135", "Al-Anbiya 21:1 - 21:28",
+            // Juz 17
+            "Al-Anbiya 21:29 - 21:50", "Al-Anbiya 21:51 - 21:82", "Al-Anbiya 21:83 - 21:112", "Al-Hajj 22:1 - 22:18", "Al-Hajj 22:19 - 22:37", "Al-Hajj 22:38 - 22:59", "Al-Hajj 22:60 - 22:78", "Al-Mu'minun 23:1 - 23:35",
+            // Juz 18
+            "Al-Mu'minun 23:36 - 23:74", "Al-Mu'minun 23:75 - 23:118", "An-Nur 24:1 - 24:20", "An-Nur 24:21 - 24:34", "An-Nur 24:35 - 24:52", "An-Nur 24:53 - 24:64", "Al-Furqan 25:1 - 25:20", "Al-Furqan 25:21 - 25:52",
+            // Juz 19
+            "Al-Furqan 25:53 - 25:77", "Ash-Shu'ara 26:1 - 26:51", "Ash-Shu'ara 26:52 - 26:110", "Ash-Shu'ara 26:111 - 26:180", "Ash-Shu'ara 26:181 - 26:227", "An-Naml 27:1 - 27:26", "An-Naml 27:27 - 27:55", "An-Naml 27:56 - 27:81",
+            // Juz 20
+            "An-Naml 27:82 - Al-Qasas 28:11", "Al-Qasas 28:12 - 28:28", "Al-Qasas 28:29 - 28:50", "Al-Qasas 28:51 - 28:75", "Al-Qasas 28:76 - 28:88", "Al-Ankabut 29:1 - 29:25", "Al-Ankabut 29:26 - 29:45", "Al-Ankabut 29:46 - 29:69",
+            // Juz 21
+            "Ar-Rum 30:1 - 30:30", "Ar-Rum 30:31 - 30:53", "Ar-Rum 30:54 - Luqman 31:21", "Luqman 31:22 - As-Sajdah 32:10", "As-Sajdah 32:11 - 32:30", "Al-Ahzab 33:1 - 33:17", "Al-Ahzab 33:18 - 33:30", "Al-Ahzab 33:31 - 33:50",
+            // Juz 22
+            "Al-Ahzab 33:51 - 33:59", "Al-Ahzab 33:60 - Saba 34:9", "Saba 34:10 - 34:23", "Saba 34:24 - 34:45", "Saba 34:46 - Fatir 35:14", "Fatir 35:15 - 35:40", "Fatir 35:41 - Ya-Sin 36:27", "Ya-Sin 36:28 - 36:59",
+            // Juz 23
+            "Ya-Sin 36:60 - As-Saffat 37:21", "As-Saffat 37:22 - 37:82", "As-Saffat 37:83 - 37:144", "As-Saffat 37:145 - Sad 38:20", "Sad 38:21 - 38:51", "Sad 38:52 - Az-Zumar 39:7", "Az-Zumar 39:8 - 39:31", "Az-Zumar 39:32 - 39:52",
+            // Juz 24
+            "Az-Zumar 39:53 - 39:75", "Ghafir 40:1 - 40:20", "Ghafir 40:21 - 40:40", "Ghafir 40:41 - 40:65", "Ghafir 40:66 - Fussilat 41:8", "Fussilat 41:9 - 41:24", "Fussilat 41:25 - 41:46", "Fussilat 41:47 - Ash-Shura 42:12",
+            // Juz 25
+            "Ash-Shura 42:13 - 42:26", "Ash-Shura 42:27 - 42:53", "Az-Zukhruf 43:1 - 43:23", "Az-Zukhruf 43:24 - 43:56", "Az-Zukhruf 43:57 - Ad-Dukhan 44:16", "Ad-Dukhan 44:17 - Al-Jathiyah 45:11", "Al-Jathiyah 45:12 - 45:37", "Al-Ahqaf 46:1 - 46:20",
+            // Juz 26
+            "Al-Ahqaf 46:21 - Muhammad 47:9", "Muhammad 47:10 - 47:32", "Muhammad 47:33 - Al-Fath 48:17", "Al-Fath 48:18 - Al-Hujurat 49:13", "Al-Hujurat 49:14 - Qaf 50:26", "Qaf 50:27 - Adh-Dhariyat 51:30", "Adh-Dhariyat 51:31 - At-Tur 52:23", "At-Tur 52:24 - An-Najm 53:25",
+            // Juz 27
+            "An-Najm 53:26 - Al-Qamar 54:8", "Al-Qamar 54:9 - 54:55", "Ar-Rahman 55:1 - 55:78", "Al-Waqi'ah 56:1 - 56:74", "Al-Waqi'ah 56:75 - Al-Hadid 57:15", "Al-Hadid 57:16 - 57:29", "Al-Mujadila 58:1 - 58:13", "Al-Mujadila 58:14 - Al-Hashr 59:10",
+            // Juz 28
+            "Al-Hashr 59:11 - Al-Mumtahanah 60:6", "Al-Mumtahanah 60:7 - As-Saff 61:14", "Al-Jumu'ah 62:1 - Al-Munafiqun 63:3", "Al-Munafiqun 63:4 - At-Taghabun 64:18", "At-Talaq 65:1 - 65:12", "At-Tahrim 66:1 - 66:12", "Al-Mulk 67:1 - 67:30", "Al-Qalam 68:1 - 68:52",
+            // Juz 29
+            "Al-Haqqah 69:1 - 69:52", "Al-Ma'arij 70:1 - Nuh 71:28", "Al-Jinn 72:1 - 72:28", "Al-Muzzammil 73:1 - Al-Muddaththir 74:56", "Al-Qiyamah 75:1 - Al-Insan 76:31", "Al-Mursalat 77:1 - 77:50", "An-Naba 78:1 - An-Nazi'at 79:46", "Abasa 80:1 - At-Takwir 81:29",
+            // Juz 30
+            "Al-Infitar 82:1 - Al-Mutaffifin 83:36", "Al-Inshiqaq 84:1 - At-Tariq 86:17", "Al-A'la 87:1 - Al-Fajr 89:30", "Al-Balad 90:1 - Al-Layl 92:21", "Ad-Duha 93:1 - Az-Zalzalah 99:8", "Al-Adiyat 100:1 - An-Nas 114:6"
+        ];
+
+        // Generate full 240 Rubu object array
+        const QURAN_RUBU_DATA = [];
+        (function buildDataset() {
+            for (let i = 0; i < 240; i++) {
+                const id = i + 1;
+                const juz = Math.floor(i / 8) + 1;
+                const rubuInJuz = (i % 8) + 1;
+                const hizb = Math.ceil(id / 4);
+
+                QURAN_RUBU_DATA.push({
+                    id: id,
+                    juz: juz,
+                    hizb: hizb,
+                    rubuInJuz: rubuInJuz,
+                    title: RUBU_PORTIONS_MAP[i] || `Juz ${juz} Rubu ${rubuInJuz}`,
+                    audioUrl: `https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/${id}.mp3`
+                });
+            }
+        })();
+
+        // App State
+        let appState = {
+            currentRubuId: 1,
+            completedRubus: [],
+            reflections: {},
+            streak: 0,
+            lastReadDate: null,
+            reciterId: '7',
+            darkTheme: false,
+            gridFilter: 'all',
+            showTranslit: true,
+            showMeaning: true,
+            showVerse: true,
+            khatmahCount: 0,
+            completedOn: {},
+            prevStreak: 0,
+            prevReadDate: null
+        };
+
+        function loadState() {
+            const saved = localStorage.getItem('one_rubu_a_day_v3');
+            if (saved) {
+                try {
+                    appState = { ...appState, ...JSON.parse(saved) };
+                } catch (e) {
+                    console.error("Error reading storage", e);
+                }
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem('one_rubu_a_day_v3', JSON.stringify(appState));
+        }
+
+        function setViewMode(mode) {
+            document.getElementById('viewToday').classList.add('hidden');
+            document.getElementById('viewNavigator').classList.add('hidden');
+            document.getElementById('viewHistory').classList.add('hidden');
+
+            document.getElementById('viewBtnToday').className = "px-4 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 transition";
+            document.getElementById('viewBtnNavigator').className = "px-4 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 transition";
+            document.getElementById('viewBtnHistory').className = "px-4 py-2 rounded-xl text-sm font-medium text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-700 transition";
+
+            if (mode === 'today') {
+                document.getElementById('viewToday').classList.remove('hidden');
+                document.getElementById('viewBtnToday').className = "px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white shadow-sm transition";
+                renderTodayView();
+            } else if (mode === 'navigator') {
+                document.getElementById('viewNavigator').classList.remove('hidden');
+                document.getElementById('viewBtnNavigator').className = "px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white shadow-sm transition";
+                renderNavigatorView();
+            } else if (mode === 'history') {
+                document.getElementById('viewHistory').classList.remove('hidden');
+                document.getElementById('viewBtnHistory').className = "px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white shadow-sm transition";
+                renderHistoryView();
+            }
+        }
+
+        const toAr = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+
+        function renderTodayView() {
+            const rubu = QURAN_RUBU_DATA.find(r => r.id === appState.currentRubuId) || QURAN_RUBU_DATA[0];
+
+            document.getElementById('todayMetaBadge').innerText = `Juz ${rubu.juz} • Hizb ${rubu.hizb} • Rubu ${rubu.rubuInJuz} of 8`;
+            document.getElementById('todaySurahTitle').innerText = rubu.title;
+            document.getElementById('todayArabicTitle').innerText = `الجزء ${toAr(rubu.juz)} • الربع ${toAr(rubu.rubuInJuz)}`;
+
+            // Completion Button
+            const isDone = appState.completedRubus.includes(rubu.id);
+            const btn = document.getElementById('markCompleteBtn');
+            if (isDone) {
+                btn.innerHTML = `<i class="fa-solid fa-circle-check text-base text-emerald-800"></i> <span>Completed! (Click to undo)</span>`;
+                btn.className = "px-6 py-3.5 rounded-2xl bg-emerald-300 text-emerald-950 font-extrabold text-sm shadow-md transition flex items-center gap-2";
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-circle-check text-base"></i> <span>Mark Today's Rubu as Completed</span>`;
+                btn.className = "px-6 py-3.5 rounded-2xl bg-amberGold-500 hover:bg-amberGold-600 text-stone-900 font-extrabold text-sm shadow-lg hover:shadow-xl transition flex items-center gap-2";
+            }
+
+            document.getElementById('todayReflectionInput').value = appState.reflections[rubu.id] || '';
+
+            updateGlobalStats();
+            renderMasterProgressionGrid();
+            if (loadedRubuId !== rubu.id) fetchWordByWordData();
+        }
+
+        let loadedRubuId = null, wbwToken = 0, readerAyahs = [], readerWords = null, wbwStatus = 'loading', playIdx = -1;
+        const wbwCache = {};
+        const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        const pad3 = n => String(n).padStart(3, '0');
+        const AUDIO_FOLDERS = { '7': 'Alafasy_128kbps', '5': 'Husary_128kbps', '8': 'Minshawy_Murattal_128kbps' };
+        const audioEl = () => document.getElementById('rubuAudioPlayer');
+        const readerBox = () => document.getElementById('wordByWordContainer');
+
+        async function getJson(url, ms = 12000) {
+            const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+            try {
+                const r = await fetch(url, { signal: ctl.signal });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return await r.json();
+            } finally { clearTimeout(t); }
+        }
+
+        // Verse text, English translation and surah names (alquran.cloud, no key needed)
+        async function loadCore(id) {
+            const [ar, en] = await Promise.all([
+                getJson(`https://api.alquran.cloud/v1/hizbQuarter/${id}/quran-uthmani`),
+                getJson(`https://api.alquran.cloud/v1/hizbQuarter/${id}/en.sahih`).catch(() => null)
+            ]);
+            const enMap = {};
+            if (en && en.data) en.data.ayahs.forEach(x => enMap[x.surah.number + ':' + x.numberInSurah] = x.text);
+            const list = ar.data.ayahs.map(x => ({ s: x.surah.number, a: x.numberInSurah, ar: x.text, en: enMap[x.surah.number + ':' + x.numberInSurah] || '', name: x.surah.englishName, nameAr: x.surah.name }));
+            return list;
+        }
+
+        // Optional word meanings (legacy Quran.com API; may be blocked or retired)
+        async function loadWbw(id) {
+            const map = {}; let page = 1;
+            while (page) {
+                const d = await getJson(`https://api.quran.com/api/v4/verses/by_rub/${id}?words=true&word_fields=text_uthmani&per_page=50&page=${page}&language=en`);
+                (d.verses || []).forEach(v => map[v.verse_key] = v.words.filter(w => w.char_type_name !== 'end').map(w => ({ ar: w.text_uthmani || w.text, tr: (w.transliteration && w.transliteration.text) || '', en: (w.translation && w.translation.text) || '' })));
+                page = d.pagination && d.pagination.next_page;
+            }
+            if (!Object.keys(map).length) throw new Error('no words');
+            return map;
+        }
+
+        function splitWords(a) {
+            let ws = a.ar.split(/\s+/).filter(Boolean);
+            const norm = w => w.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '');
+            if (a.a === 1 && a.s !== 1 && a.s !== 9 && ws.length > 4 && norm(ws[0]) === 'بسم') ws = ws.slice(4);
+            return ws.map(w => ({ ar: w, tr: '', en: '' }));
+        }
+
+        function applyReaderPrefs() {
+            const c = readerBox();
+            c.classList.toggle('hide-translit', !appState.showTranslit);
+            c.classList.toggle('hide-meaning', !appState.showMeaning);
+            c.classList.toggle('hide-verse', !appState.showVerse);
+            [['toggleTranslitBtn','showTranslit'],['toggleMeaningBtn','showMeaning'],['toggleVerseBtn','showVerse']].forEach(([id, k]) => document.getElementById(id).classList.toggle('on', !!appState[k]));
+        }
+        function toggleReaderPref(key) { appState[key] = !appState[key]; saveState(); applyReaderPrefs(); }
+
+        function renderReader() {
+            const c = readerBox(), top = c.scrollTop;
+            const note = wbwStatus === 'loading' ? 'Loading word meanings…' : wbwStatus === 'failed' ? 'Word meanings could not be loaded, so words are shown without translations. Press reload to retry.' : '';
+            c.innerHTML = (note ? `<p class="reader-note">${note}</p>` : '') + readerAyahs.map((a, i) => {
+                const key = a.s + ':' + a.a;
+                const ws = (readerWords && readerWords[key]) || splitWords(a);
+                const words = ws.map(w => `<span class="w"><span class="w-ar" lang="ar">${esc(w.ar)}</span><span class="w-tr">${esc(w.tr)}</span><span class="w-en">${esc(w.en)}</span></span>`).join('') + `<span class="ayah-end">${toAr(a.a)}</span>`;
+                const banner = a.a === 1 ? `<div class="surah-break"><span>${esc(a.name)}</span> <span class="font-arabic" lang="ar" dir="rtl">${esc(a.nameAr)}</span>${a.s !== 1 && a.s !== 9 ? '<div class="bismillah" lang="ar" dir="rtl">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</div>' : ''}</div>` : '';
+                return `${banner}<article class="verse${i === playIdx ? ' playing' : ''}" id="v-${i}"><button class="verse-ref" onclick="playFrom(${i})" aria-label="Play verse ${key}"><i class="fa-solid fa-play"></i>${key}</button><div class="words" dir="rtl" lang="ar">${words}</div>${a.en ? `<p class="verse-tr">${esc(a.en)}</p>` : ''}</article>`;
+            }).join('') + (readerAyahs.some(a => a.en) ? '<p class="verse-source">Translation: Saheeh International, sourced from the <a href="https://alquran.cloud" target="_blank" rel="noopener" class="underline">Al Quran Cloud API</a></p>' : '');
+            c.scrollTop = top;
+        }
+
+        async function fetchWordByWordData(force) {
+            const id = appState.currentRubuId, token = ++wbwToken, c = readerBox();
+            loadedRubuId = id; playIdx = -1; audioEl().pause(); applyReaderPrefs();
+            if (force === true) delete wbwCache[id];
+            let entry = wbwCache[id];
+            if (!entry) {
+                c.innerHTML = `<div class="text-center py-10 text-stone-400 text-sm"><i class="fa-solid fa-spinner fa-spin text-xl text-emerald-600 mb-2 block"></i>Loading Rubu ${id}…</div>`;
+                const wbwP = loadWbw(id).then(v => v, () => null);
+                let ayahs = null, coreErr = null;
+                try { ayahs = await loadCore(id); } catch (e) { coreErr = e; }
+                if (token !== wbwToken) return;
+                let words = null;
+                if (!ayahs) {
+                    words = await wbwP;
+                    if (token !== wbwToken) return;
+                    if (words) ayahs = Object.keys(words).map(k => { const [s, a] = k.split(':').map(Number); return { s, a, ar: words[k].map(w => w.ar).join(' '), en: '', name: 'Surah ' + s, nameAr: '' }; });
+                }
+                if (!ayahs || !ayahs.length) {
+                    audioEl().removeAttribute('src');
+                    document.getElementById('audioStatusText').textContent = 'Unavailable';
+                    c.innerHTML = `<div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200 text-center">Could not reach the Quran text service (${esc(coreErr && coreErr.message)}). Check your connection or whether alquran.cloud is blocked on your network, then press reload.</div>`;
+                    return;
+                }
+                readerAyahs = ayahs; readerWords = words; wbwStatus = words ? 'ok' : 'loading';
+                renderReader(); setTrack(0, false);
+                if (!words) {
+                    words = await wbwP;
+                    if (token !== wbwToken) return;
+                    readerWords = words; wbwStatus = words ? 'ok' : 'failed';
+                }
+                entry = wbwCache[id] = { ayahs, words, status: wbwStatus };
+                renderReader();
+                return;
+            }
+            readerAyahs = entry.ayahs; readerWords = entry.words; wbwStatus = entry.status;
+            renderReader(); setTrack(0, false);
+        }
+
+                        // Audio: one EveryAyah file per verse, played in sequence
+        function ayahAudioUrl(a) { return `https://everyayah.com/data/${AUDIO_FOLDERS[appState.reciterId] || AUDIO_FOLDERS['7']}/${pad3(a.s)}${pad3(a.a)}.mp3`; }
+        function setTrack(i, autoplay) {
+            if (i < 0 || i >= readerAyahs.length) return;
+            playIdx = i;
+            const a = readerAyahs[i], el = audioEl();
+            el.src = ayahAudioUrl(a);
+            if (autoplay) el.play().catch(() => {});
+            document.getElementById('audioStatusText').textContent = `Verse ${a.s}:${a.a} · ${i + 1} of ${readerAyahs.length}`;
+            document.querySelectorAll('.verse.playing').forEach(n => n.classList.remove('playing'));
+            const v = document.getElementById('v-' + i);
+            if (v) {
+                v.classList.add('playing');
+                if (autoplay) { const c = readerBox(); c.scrollTo({ top: v.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop - 12, behavior: 'smooth' }); }
+            }
+        }
+        function playFrom(i) { setTrack(i, true); }
+        function stepVerse(d) { setTrack(playIdx + d, !audioEl().paused); }
+        audioEl().addEventListener('ended', () => {
+            if (playIdx + 1 < readerAyahs.length) setTrack(playIdx + 1, true);
+            else document.getElementById('audioStatusText').textContent = 'End of this Rubu';
+        });
+        audioEl().addEventListener('error', () => { if (audioEl().getAttribute('src')) document.getElementById('audioStatusText').textContent = 'Audio failed to load'; });
+
+        function navigateRubu(delta) {
+            let newId = appState.currentRubuId + delta;
+            if (newId >= 1 && newId <= 240) {
+                appState.currentRubuId = newId;
+                saveState();
+                renderTodayView();
+            }
+        }
+
+        const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dayKey(d); };
+        const currentStreak = () => (appState.lastReadDate === dayKey() || appState.lastReadDate === yesterdayKey()) ? appState.streak : 0;
+
+        function toggleRubuCompletion(rubuId) {
+            const today = dayKey();
+            appState.completedOn = appState.completedOn || {};
+            const index = appState.completedRubus.indexOf(rubuId);
+
+            if (index > -1) {
+                appState.completedRubus.splice(index, 1);
+                delete appState.completedOn[rubuId];
+                if (appState.lastReadDate === today && !Object.values(appState.completedOn).includes(today)) {
+                    appState.streak = appState.prevStreak || 0;
+                    appState.lastReadDate = appState.prevReadDate || null;
+                }
+            } else {
+                appState.completedRubus.push(rubuId);
+                appState.completedOn[rubuId] = today;
+                triggerCelebration();
+                if (appState.lastReadDate !== today) {
+                    appState.prevStreak = appState.streak;
+                    appState.prevReadDate = appState.lastReadDate;
+                    appState.streak = appState.lastReadDate === yesterdayKey() ? appState.streak + 1 : 1;
+                    appState.lastReadDate = today;
+                }
+                const rubu = QURAN_RUBU_DATA.find(r => r.id === rubuId);
+                const juzIds = QURAN_RUBU_DATA.filter(r => r.juz === rubu.juz).map(r => r.id);
+                if (juzIds.every(id => appState.completedRubus.includes(id))) openJuzModal(rubu.juz);
+            }
+
+            saveState();
+            renderTodayView();
+        }
+
+        function toggleCompleteCurrentRubu() {
+            toggleRubuCompletion(appState.currentRubuId);
+        }
+
+        function saveCurrentReflection() {
+            const text = document.getElementById('todayReflectionInput').value;
+            appState.reflections[appState.currentRubuId] = text;
+            saveState();
+        }
+
+        function renderNavigatorView() {
+            const container = document.getElementById('juzAccordionContainer');
+            container.innerHTML = '';
+
+            for (let j = 1; j <= 30; j++) {
+                const juzRubus = QURAN_RUBU_DATA.filter(r => r.juz === j);
+                const completedInJuz = juzRubus.filter(r => appState.completedRubus.includes(r.id)).length;
+                const isFullyDone = completedInJuz === 8;
+
+                const accordion = document.createElement('div');
+                accordion.className = 'bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 shadow-sm overflow-hidden';
+                
+                accordion.innerHTML = `
+                    <div onclick="toggleAccordion('juz-acc-${j}')" class="p-4 cursor-pointer flex items-center justify-between hover:bg-stone-50 dark:hover:bg-slate-700/50 transition">
+                        <div class="flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs flex items-center justify-center">
+                                ${j}
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-sm text-stone-800 dark:text-stone-100">Juz ${j}</h4>
+                                <p class="text-xs text-stone-500 dark:text-slate-400">${completedInJuz} of 8 Rubu completed</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            ${isFullyDone ? '<span class="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-circle-check"></i> Complete</span>' : ''}
+                            <i class="fa-solid fa-chevron-down text-xs text-stone-400 transition-transform duration-300" id="icon-juz-acc-${j}"></i>
+                        </div>
+                    </div>
+
+                    <div id="juz-acc-${j}" class="hidden border-t border-stone-100 dark:border-slate-700 p-3 bg-stone-50/50 dark:bg-slate-900/40 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        ${juzRubus.map(r => {
+                            const isDone = appState.completedRubus.includes(r.id);
+                            return `
+                                <div onclick="selectRubuFromNavigator(${r.id})" class="p-3 rounded-xl border ${isDone ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800' : 'bg-white dark:bg-slate-800 border-stone-200 dark:border-slate-700'} hover:border-emerald-500 cursor-pointer transition flex items-center justify-between">
+                                    <div class="text-xs">
+                                        <span class="font-bold text-stone-800 dark:text-stone-200">Rubu ${r.rubuInJuz}</span>
+                                        <p class="text-[11px] text-stone-500 dark:text-slate-400 truncate max-w-[200px]">${r.title}</p>
+                                    </div>
+                                    <i class="${isDone ? 'fa-solid fa-circle-check text-emerald-600' : 'fa-regular fa-circle text-stone-300'} text-lg"></i>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                container.appendChild(accordion);
+            }
+        }
+
+        function toggleAccordion(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById('icon-' + id);
+            content.classList.toggle('hidden');
+            if (icon) icon.classList.toggle('rotate-180');
+        }
+
+        function expandAllJuz() {
+            for (let j = 1; j <= 30; j++) {
+                const content = document.getElementById(`juz-acc-${j}`);
+                if (content) content.classList.remove('hidden');
+            }
+        }
+
+        function collapseAllJuz() {
+            for (let j = 1; j <= 30; j++) {
+                const content = document.getElementById(`juz-acc-${j}`);
+                if (content) content.classList.add('hidden');
+            }
+        }
+
+        function selectRubuFromNavigator(rubuId) {
+            appState.currentRubuId = rubuId;
+            saveState();
+            setViewMode('today');
+        }
+
+        function renderHistoryView() {
+            const container = document.getElementById('historyListContainer');
+            container.innerHTML = '';
+
+            const keys = Object.keys(appState.reflections).filter(k => appState.reflections[k].trim() !== '');
+
+            if (keys.length === 0) {
+                container.innerHTML = `<p class="text-xs text-stone-400 italic py-4 text-center">No reflections recorded yet. Write your thoughts on Today's Focus tab!</p>`;
+                return;
+            }
+
+            keys.forEach(rubuId => {
+                const r = QURAN_RUBU_DATA.find(item => item.id === parseInt(rubuId));
+                if (!r) return;
+
+                const card = document.createElement('div');
+                card.className = "p-4 rounded-xl bg-stone-50 dark:bg-slate-900/60 border border-stone-200 dark:border-slate-700 space-y-1.5";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-emerald-700 dark:text-emerald-400">Juz ${r.juz} • Rubu ${r.rubuInJuz} (${r.title})</span>
+                        <button onclick="selectRubuFromNavigator(${r.id})" class="text-[11px] text-stone-500 hover:text-emerald-600 underline">View Rubu</button>
+                    </div>
+                    <p class="text-xs text-stone-700 dark:text-slate-200">${appState.reflections[rubuId]}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderMasterProgressionGrid() {
+            const gridContainer = document.getElementById('masterProgressionGrid');
+            gridContainer.innerHTML = '';
+
+            for (let j = 1; j <= 30; j++) {
+                const juzRubus = QURAN_RUBU_DATA.filter(r => r.juz === j);
+                const completedInJuz = juzRubus.filter(r => appState.completedRubus.includes(r.id)).length;
+                const juzPercent = Math.round((completedInJuz / 8) * 100);
+
+                if (appState.gridFilter === 'done' && completedInJuz === 0) continue;
+                if (appState.gridFilter === 'pending' && completedInJuz === 8) continue;
+
+                const juzBlock = document.createElement('div');
+                juzBlock.className = "bg-stone-50 dark:bg-slate-900/70 rounded-2xl p-4 border border-stone-200 dark:border-slate-700 space-y-3";
+
+                juzBlock.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 dark:border-slate-700 pb-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center">
+                                ${j}
+                            </span>
+                            <h3 class="font-extrabold text-sm text-stone-800 dark:text-stone-100">Juz ${j} Progression</h3>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">${completedInJuz} / 8 Rubu (${juzPercent}%)</span>
+                            <div class="w-20 bg-stone-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                <div class="bg-emerald-600 h-full" style="width: ${juzPercent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                        ${juzRubus.map(r => {
+                            const isDone = appState.completedRubus.includes(r.id);
+                            const isCurrent = appState.currentRubuId === r.id;
+
+                            if (appState.gridFilter === 'done' && !isDone) return '';
+                            if (appState.gridFilter === 'pending' && isDone) return '';
+
+                            return `
+                                <div class="p-2.5 rounded-xl border ${isDone ? 'bg-emerald-100/70 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800' : isCurrent ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300' : 'bg-white dark:bg-slate-800 border-stone-200 dark:border-slate-700'} flex items-start gap-2.5 transition">
+                                    <input type="checkbox" id="master-cb-${r.id}" ${isDone ? 'checked' : ''} onchange="toggleRubuCompletion(${r.id})" class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                                    <div class="flex-1 min-w-0 cursor-pointer" onclick="selectRubuFromNavigator(${r.id})">
+                                        <div class="flex items-center justify-between gap-1">
+                                            <span class="text-xs font-bold text-stone-800 dark:text-stone-200">Rubu ${r.rubuInJuz}</span>
+                                            ${isCurrent ? '<span class="text-[9px] bg-amber-400 font-black px-1.5 py-0.2 rounded text-stone-900">ACTIVE</span>' : ''}
+                                        </div>
+                                        <p class="text-[11px] text-stone-500 dark:text-slate-400 truncate">${r.title}</p>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                gridContainer.appendChild(juzBlock);
+            }
+
+            document.getElementById('masterCompletedStats').innerText = `${appState.completedRubus.length} / 240`;
+        }
+
+        function filterMasterGrid(filterType) {
+            appState.gridFilter = filterType;
+            
+            document.getElementById('filterAllBtn').className = "px-3 py-1 rounded-lg font-bold transition " + (filterType === 'all' ? 'bg-emerald-600 text-white' : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300');
+            document.getElementById('filterDoneBtn').className = "px-3 py-1 rounded-lg font-bold transition " + (filterType === 'done' ? 'bg-emerald-600 text-white' : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300');
+            document.getElementById('filterPendingBtn').className = "px-3 py-1 rounded-lg font-bold transition " + (filterType === 'pending' ? 'bg-emerald-600 text-white' : 'bg-stone-100 dark:bg-slate-700 text-stone-600 dark:text-slate-300');
+
+            renderMasterProgressionGrid();
+        }
+
+        function adjustKhatmah(d) {
+            appState.khatmahCount = Math.max(0, (appState.khatmahCount || 0) + d);
+            saveState();
+            updateGlobalStats();
+        }
+
+        function finishKhatmah() {
+            if (!confirm('Log this completion and clear your 240 checkmarks to start a new round? Your reflections are kept.')) return;
+            appState.khatmahCount = (appState.khatmahCount || 0) + 1;
+            appState.completedRubus = [];
+            appState.completedOn = {};
+            appState.currentRubuId = 1;
+            saveState();
+            triggerCelebration();
+            renderTodayView();
+        }
+
+        function updateGlobalStats() {
+            document.getElementById('khatmahCount').innerText = appState.khatmahCount || 0;
+            document.getElementById('khatmahFinishBtn').classList.toggle('hidden', appState.completedRubus.length !== 240);
+            const count = appState.completedRubus.length;
+            document.getElementById('completedRubuCount').innerText = count;
+
+            const current = QURAN_RUBU_DATA.find(r => r.id === appState.currentRubuId) || QURAN_RUBU_DATA[0];
+            document.getElementById('currentPositionText').innerText = `Juz ${current.juz} • Rubu ${current.rubuInJuz}`;
+
+            const percent = Math.round((count / 240) * 100);
+            document.getElementById('overallPercentText').innerText = percent + '%';
+            document.getElementById('overallProgressBar').style.width = percent + '%';
+
+            document.getElementById('streakCounter').innerText = `${currentStreak()} Day Streak`;
+        }
+
+        const hijriFmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', { day: 'numeric', month: 'numeric', year: 'numeric' });
+        function hijri(d) { const p = {}; hijriFmt.formatToParts(d).forEach(x => p[x.type] = +x.value); return { d: p.day, m: p.month, y: p.year }; }
+        let ramadanTarget = null;
+        function findNextRamadan() {
+            const base = new Date(); base.setHours(0, 0, 0, 0);
+            for (let i = 0; i < 400; i++) {
+                const t = new Date(base); t.setDate(base.getDate() + i);
+                const hj = hijri(t);
+                if (hj.m === 9 && hj.d === 1) return { date: t, year: hj.y };
+            }
+            return null;
+        }
+
+        function renderRamadan() {
+            const title = document.getElementById('ramadanTitle'), sub = document.getElementById('ramadanSub');
+            const pace = document.getElementById('ramadanPace'), clock = document.getElementById('ramadanClock');
+            try {
+                const now = new Date(), hj = hijri(now);
+                if (hj.m === 9) {
+                    title.textContent = 'Ramadan Mubarak';
+                    sub.textContent = `Day ${hj.d} of Ramadan ${hj.y}`;
+                    pace.textContent = ''; clock.innerHTML = '';
+                    return;
+                }
+                if (!ramadanTarget || ramadanTarget.date <= now) ramadanTarget = findNextRamadan();
+                if (!ramadanTarget) throw new Error('no date');
+                const ms = ramadanTarget.date - now;
+                const days = Math.floor(ms / 864e5), hrs = Math.floor(ms / 36e5) % 24, mins = Math.floor(ms / 6e4) % 60, secs = Math.floor(ms / 1e3) % 60;
+                title.textContent = `Ramadan ${ramadanTarget.year}`;
+                sub.textContent = 'Expected to begin ' + ramadanTarget.date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                clock.innerHTML = [[days, 'days'], [hrs, 'hours'], [mins, 'minutes'], [secs, 'seconds']].map(([v, l]) =>
+                    `<div class="text-center bg-white/10 rounded-xl px-3 py-2.5 min-w-[62px]"><div class="font-serif text-3xl font-semibold tabular-nums">${String(v).padStart(2, '0')}</div><div class="text-[11px] text-emerald-100">${l}</div></div>`).join('');
+                const left = 240 - appState.completedRubus.length;
+                pace.textContent = left === 0 ? 'You have finished every Rubu in this round.'
+                    : days >= left ? `One Rubu a day finishes your remaining ${left} Rubus ${days - left} days before Ramadan.`
+                    : `Finishing your remaining ${left} Rubus before Ramadan means about ${Math.ceil(left / Math.max(days, 1))} a day.`;
+            } catch (e) {
+                title.textContent = 'Ramadan'; sub.textContent = 'Countdown is not supported in this browser.'; pace.textContent = ''; clock.innerHTML = '';
+            }
+        }
+
+        function triggerCelebration() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    origin: { y: 0.7 },
+                    colors: ['#16a34a', '#f59e0b', '#3b82f6']
+                });
+            }
+        }
+
+        function openJuzModal(juzNum) {
+            document.getElementById('juzModalTitle').innerText = `Juz ${juzNum} Completed`;
+            document.getElementById('juzModal').classList.remove('hidden');
+            triggerCelebration();
+        }
+
+        function closeJuzModal() {
+            document.getElementById('juzModal').classList.add('hidden');
+        }
+
+        function toggleTheme() {
+            appState.darkTheme = !appState.darkTheme;
+            document.documentElement.classList.toggle('dark', appState.darkTheme);
+            saveState();
+        }
+
+        function changeReciter() {
+            appState.reciterId = document.getElementById('reciterSelect').value;
+            saveState();
+            if (playIdx >= 0) setTrack(playIdx, !audioEl().paused);
+        }
+
+        window.onload = function() {
+            loadState();
+            if (appState.darkTheme) document.documentElement.classList.add('dark');
+            document.getElementById('reciterSelect').value = appState.reciterId;
+            renderTodayView();
+            if (DONATION_URL) {
+                document.getElementById('donateLink').href = DONATION_URL;
+                document.getElementById('donateBox').classList.remove('hidden');
+            }
+            renderRamadan();
+            setInterval(renderRamadan, 1000);
+        };
+    </script>
+</body>
+</html>
