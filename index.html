@@ -87,7 +87,7 @@
                 </svg>
                 <div>
                     <h1 class="text-2xl font-semibold leading-none text-stone-900 dark:text-white flex items-baseline gap-3">One Rubu a Day <span class="font-arabic text-lg font-normal text-amberGold-600" lang="ar" dir="rtl">رُبْعٌ كُلَّ يَوْمٍ</span></h1>
-                    <p class="text-xs mt-1.5 text-stone-500 dark:text-slate-400">ADHD-Friendly Daily Quran Tracker</p>
+                    <p class="text-xs mt-1.5 text-stone-500 dark:text-slate-400">Daily Quran Tracker</p>
                 </div>
             </div>
 
@@ -260,7 +260,11 @@
                     <i class="fa-solid fa-pen-fancy text-emerald-600 dark:text-emerald-400"></i> Daily Reflection & Personal Notes
                 </h3>
                 <p class="text-xs text-stone-500 dark:text-slate-400">Write key Ayah takeaways, personal thoughts, or memorable insights from this Rubu.</p>
-                <textarea id="todayReflectionInput" oninput="saveCurrentReflection()" rows="4" placeholder="Write your reflection here..." class="w-full p-3 text-sm rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-900 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scrollbar resize-none"></textarea>
+                <textarea id="todayReflectionInput" oninput="markReflectionDirty()" rows="4" placeholder="Write your reflection here..." class="w-full p-3 text-sm rounded-xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-900 dark:text-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 custom-scrollbar resize-none"></textarea>
+                <div class="flex items-center justify-between gap-3">
+                    <span id="reflectionStatus" class="text-xs text-stone-500 dark:text-slate-400" aria-live="polite"></span>
+                    <button onclick="saveCurrentReflection()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition"><i class="fa-solid fa-floppy-disk mr-1.5"></i>Save reflection</button>
+                </div>
             </div>
         </section>
 
@@ -483,6 +487,7 @@
         }
 
         function setViewMode(mode) {
+            flushReflection();
             document.getElementById('viewToday').classList.add('hidden');
             document.getElementById('viewNavigator').classList.add('hidden');
             document.getElementById('viewHistory').classList.add('hidden');
@@ -509,6 +514,7 @@
         const toAr = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
 
         function renderTodayView() {
+            flushReflection();
             const rubu = QURAN_RUBU_DATA.find(r => r.id === appState.currentRubuId) || QURAN_RUBU_DATA[0];
 
             document.getElementById('todayMetaBadge').innerText = `Juz ${rubu.juz} • Hizb ${rubu.hizb} • Rubu ${rubu.rubuInJuz} of 8`;
@@ -527,6 +533,9 @@
             }
 
             document.getElementById('todayReflectionInput').value = appState.reflections[rubu.id] || '';
+            reflectionRubuId = rubu.id;
+            reflectionDirty = false;
+            setReflectionStatus((appState.reflections[rubu.id] || '').trim() ? 'Saved' : '');
 
             updateGlobalStats();
             renderMasterProgressionGrid();
@@ -709,15 +718,49 @@
             renderTodayView();
         }
 
+        function toggleJuzCompletion(j) {
+            const ids = QURAN_RUBU_DATA.filter(r => r.juz === j).map(r => r.id);
+            const allDone = ids.every(id => appState.completedRubus.includes(id));
+            const navVisible = !document.getElementById('viewNavigator').classList.contains('hidden');
+            const open = navVisible ? [...document.querySelectorAll('#juzAccordionContainer div[id^="juz-acc-"]:not(.hidden)')].map(e => e.id) : [];
+            appState.completedOn = appState.completedOn || {};
+
+            if (allDone) {
+                appState.completedRubus = appState.completedRubus.filter(id => !ids.includes(id));
+                ids.forEach(id => delete appState.completedOn[id]);
+                if (appState.lastReadDate === dayKey() && !Object.values(appState.completedOn).includes(dayKey())) {
+                    appState.streak = appState.prevStreak || 0;
+                    appState.lastReadDate = appState.prevReadDate || null;
+                }
+            } else {
+                ids.forEach(id => { if (!appState.completedRubus.includes(id)) appState.completedRubus.push(id); });
+            }
+
+            saveState();
+            renderTodayView();
+            if (navVisible) {
+                renderNavigatorView();
+                open.forEach(id => { document.getElementById(id).classList.remove('hidden'); const ic = document.getElementById('icon-' + id); if (ic) ic.classList.add('rotate-180'); });
+            }
+            if (!allDone) openJuzModal(j);
+        }
+
         function toggleCompleteCurrentRubu() {
             toggleRubuCompletion(appState.currentRubuId);
         }
 
+        let reflectionDirty = false, reflectionRubuId = null;
+        function setReflectionStatus(t) { document.getElementById('reflectionStatus').textContent = t; }
+        function markReflectionDirty() { reflectionDirty = true; setReflectionStatus('Unsaved changes'); }
         function saveCurrentReflection() {
             const text = document.getElementById('todayReflectionInput').value;
-            appState.reflections[appState.currentRubuId] = text;
+            appState.reflections[reflectionRubuId || appState.currentRubuId] = text;
             saveState();
+            reflectionDirty = false;
+            setReflectionStatus(text.trim() ? 'Saved' : 'Cleared');
         }
+        function flushReflection() { if (reflectionDirty) saveCurrentReflection(); }
+        window.addEventListener('pagehide', flushReflection);
 
         function renderNavigatorView() {
             const container = document.getElementById('juzAccordionContainer');
@@ -743,6 +786,7 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
+                            <button onclick="event.stopPropagation(); toggleJuzCompletion(${j})" class="w-7 h-7 rounded-lg border text-xs ${isFullyDone ? 'border-emerald-300 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40' : 'border-stone-200 dark:border-slate-600 text-stone-500 dark:text-slate-300 hover:border-emerald-500'}" title="${isFullyDone ? 'Undo: unmark all of Juz ' + j : 'Mark all of Juz ' + j + ' as done'}" aria-label="${isFullyDone ? 'Unmark Juz ' + j : 'Mark Juz ' + j + ' as done'}"><i class="fa-solid ${isFullyDone ? 'fa-rotate-left' : 'fa-check-double'}"></i></button>
                             ${isFullyDone ? '<span class="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2.5 py-1 rounded-full"><i class="fa-solid fa-circle-check"></i> Complete</span>' : ''}
                             <i class="fa-solid fa-chevron-down text-xs text-stone-400 transition-transform duration-300" id="icon-juz-acc-${j}"></i>
                         </div>
@@ -846,6 +890,7 @@
                             <h3 class="font-extrabold text-sm text-stone-800 dark:text-stone-100">Juz ${j} Progression</h3>
                         </div>
                         <div class="flex items-center gap-3 text-xs">
+                            <button onclick="toggleJuzCompletion(${j})" class="px-2 py-1 rounded-md text-[11px] font-semibold border ${completedInJuz === 8 ? 'border-emerald-300 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40' : 'border-stone-200 dark:border-slate-600 text-stone-600 dark:text-slate-300 hover:border-emerald-500'}" title="${completedInJuz === 8 ? 'Unmark all of Juz ' + j : 'Mark all of Juz ' + j + ' as done'}"><i class="fa-solid ${completedInJuz === 8 ? 'fa-rotate-left' : 'fa-check-double'} mr-1"></i>${completedInJuz === 8 ? 'Undo' : 'Mark juz done'}</button>
                             <span class="font-bold text-emerald-700 dark:text-emerald-400">${completedInJuz} / 8 Rubu (${juzPercent}%)</span>
                             <div class="w-20 bg-stone-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
                                 <div class="bg-emerald-600 h-full" style="width: ${juzPercent}%"></div>
